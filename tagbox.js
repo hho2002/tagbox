@@ -6,6 +6,71 @@
  * License: MIT
  */
 
+// Production steps of ECMA-262, Edition 5, 15.4.4.14
+// Reference: http://es5.github.io/#x15.4.4.14
+if (!Array.prototype.indexOf) {
+  Array.prototype.indexOf = function(searchElement, fromIndex) {
+
+    var k;
+
+    // 1. Let O be the result of calling ToObject passing
+    //    the this value as the argument.
+    if (this == null) {
+      throw new TypeError('"this" is null or not defined');
+    }
+
+    var O = Object(this);
+
+    // 2. Let lenValue be the result of calling the Get
+    //    internal method of O with the argument "length".
+    // 3. Let len be ToUint32(lenValue).
+    var len = O.length >>> 0;
+
+    // 4. If len is 0, return -1.
+    if (len === 0) {
+      return -1;
+    }
+
+    // 5. If argument fromIndex was passed let n be
+    //    ToInteger(fromIndex); else let n be 0.
+    var n = +fromIndex || 0;
+
+    if (Math.abs(n) === Infinity) {
+      n = 0;
+    }
+
+    // 6. If n >= len, return -1.
+    if (n >= len) {
+      return -1;
+    }
+
+    // 7. If n >= 0, then Let k be n.
+    // 8. Else, n<0, Let k be len - abs(n).
+    //    If k is less than 0, then let k be 0.
+    k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+
+    // 9. Repeat, while k < len
+    while (k < len) {
+      // a. Let Pk be ToString(k).
+      //   This is implicit for LHS operands of the in operator
+      // b. Let kPresent be the result of calling the
+      //    HasProperty internal method of O with argument Pk.
+      //   This step can be combined with c
+      // c. If kPresent is true, then
+      //    i.  Let elementK be the result of calling the Get
+      //        internal method of O with the argument ToString(k).
+      //   ii.  Let same be the result of applying the
+      //        Strict Equality Comparison Algorithm to
+      //        searchElement and elementK.
+      //  iii.  If same is true, return k.
+      if (k in O && O[k] === searchElement) {
+        return k;
+      }
+      k++;
+    }
+    return -1;
+  };
+}
 
 ;(function($, window, undefined){
 
@@ -688,11 +753,59 @@ var TagBox = function(el, opts){
     if(!dropdown.el.parent().length) dropdown.el.appendTo(opts['dropdownContainer']);
   }, 500);
 
+function getInputSelection(el) {
+    var start = 0, end = 0, normalizedValue, range,
+        textInputRange, len, endRange;
+
+    if (typeof el.selectionStart == "number" && typeof el.selectionEnd == "number") {
+        start = el.selectionStart;
+        end = el.selectionEnd;
+    } else {
+        range = document.selection.createRange();
+
+        if (range && range.parentElement() == el) {
+            len = el.value.length;
+            normalizedValue = el.value.replace(/\r\n/g, "\n");
+
+            // Create a working TextRange that lives only in the input
+            textInputRange = el.createTextRange();
+            textInputRange.moveToBookmark(range.getBookmark());
+
+            // Check if the start and end of the selection are at the very end
+            // of the input, since moveStart/moveEnd doesn't return what we want
+            // in those cases
+            endRange = el.createTextRange();
+            endRange.collapse(false);
+
+            if (textInputRange.compareEndPoints("StartToEnd", endRange) > -1) {
+                start = end = len;
+            } else {
+                start = -textInputRange.moveStart("character", -len);
+                start += normalizedValue.slice(0, start).split("\n").length - 1;
+
+                if (textInputRange.compareEndPoints("EndToEnd", endRange) > -1) {
+                    end = len;
+                } else {
+                    end = -textInputRange.moveEnd("character", -len);
+                    end += normalizedValue.slice(0, end).split("\n").length - 1;
+                }
+            }
+        }
+    }
+
+    return {
+        start: start,
+        end: end
+    };
+}
 
   function handleKeyDown(e){
 
-    var cursorFarRight = (newInput.val().length == newInput[0].selectionStart);
-    var cursorFarLeft = (newInput[0].selectionEnd === 0);
+    //var cursorFarRight = (newInput.val().length == newInput[0].selectionStart);
+    //var cursorFarLeft = (newInput[0].selectionEnd === 0);
+    var inputSelection = getInputSelection(newInput[0]);
+    var cursorFarRight = (newInput.val().length == inputSelection.start);
+    var cursorFarLeft = (inputSelection.end === 0);
 
     var theKeyCode = e.keyCode;
 
@@ -972,7 +1085,7 @@ var TagBox = function(el, opts){
       Math.min(
         wrapper.width() - 5,
         Math.max(
-          wrapper.width() - newInput.offset().left + wrapper.offset().left + 5,
+          wrapper.width() - newInput.offset().left + wrapper.offset().left - 5,
           resizer.width(),
           1
         )
