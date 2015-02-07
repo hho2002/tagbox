@@ -47,7 +47,10 @@ if (!Array.prototype.indexOf) {
     // 7. If n >= 0, then Let k be n.
     // 8. Else, n<0, Let k be len - abs(n).
     //    If k is less than 0, then let k be 0.
-    k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+    if (n < 0) {
+      n = len - Math.abs(n);
+    }
+    k = Math.max(n, 0);
 
     // 9. Repeat, while k < len
     while (k < len) {
